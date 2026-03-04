@@ -93,7 +93,33 @@ async def process_video(req: ProcessRequest):
 
                 yield f"data: {json.dumps({'status': 'step', 'step': 3, 'msg': 'AI is being forced to listen to every word. it did not consent 🤖'})}\n\n"
 
-                transcript = transcriber.transcribe(actual_path, config=config)
+                # Run transcription in background, stream funny messages while waiting
+                loop = asyncio.get_event_loop()
+                transcribe_task = loop.run_in_executor(
+                    None, lambda: transcriber.transcribe(actual_path, config=config)
+                )
+
+                waiting_msgs = [
+                    "AI is suffering through this so you don't have to 😔",
+                    "still listening... it's taking notes 📝",
+                    "your podcast is 73% filler apparently 💀",
+                    "the AI has developed opinions. we're scared 😰",
+                    "identifying who talks the most (we already know) 🙄",
+                    "processing... please do not tap the glass 🐟",
+                    "counting every 'um', 'like', and 'you know' 🫠",
+                    "almost there... probably... maybe... 🤞",
+                    "the AI is judging everyone's vocal fry rn 😶",
+                    "still going. this podcast could've been an email 📧",
+                ]
+                msg_index = 0
+                while not transcribe_task.done():
+                    await asyncio.sleep(4)
+                    if not transcribe_task.done():
+                        msg = waiting_msgs[msg_index % len(waiting_msgs)]
+                        msg_index += 1
+                        yield f"data: {json.dumps({'status': 'step', 'step': 3, 'msg': msg})}\n\n"
+
+                transcript = await transcribe_task
 
                 if transcript.status == aai.TranscriptStatus.error:
                     yield f"data: {json.dumps({'status': 'error', 'msg': transcript.error})}\n\n"
