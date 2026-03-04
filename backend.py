@@ -48,10 +48,9 @@ async def process_video(req: ProcessRequest):
             try:
                 proc = await asyncio.create_subprocess_exec(
                     "python3", "-m", "yt_dlp",
-                    "-x",
-                    "--audio-format", "mp3",
-                    "--audio-quality", "5",
+                    "-f", "bestaudio",
                     "--no-playlist",
+                    "--no-post-overwrites",
                     "-o", audio_path,
                     req.youtube_url,
                     stdout=asyncio.subprocess.PIPE,
@@ -65,7 +64,10 @@ async def process_video(req: ProcessRequest):
 
                 await proc.wait()
                 if proc.returncode != 0:
-                    yield f"data: {json.dumps({'status': 'error', 'msg': 'yt-dlp failed. make sure its installed: brew install yt-dlp'})}\n\n"
+                    # collect remaining output for real error
+                    remaining = await proc.stdout.read()
+                    err_text = remaining.decode()[-500:]
+                    yield f"data: {json.dumps({'status': 'error', 'msg': f'yt-dlp failed: {err_text}'})}\n\n"
                     return
 
             except FileNotFoundError:
